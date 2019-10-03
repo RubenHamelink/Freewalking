@@ -1,13 +1,9 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using ColossalFramework;
 using ICities;
 using UnityEngine;
 
-namespace Freewalking
+namespace Freewalking.UI
 {
     public class FreewalkingCamera : ICameraExtension
     {

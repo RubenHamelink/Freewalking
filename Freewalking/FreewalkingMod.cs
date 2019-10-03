@@ -2,19 +2,10 @@
 
 namespace Freewalking
 {
-
-    public class FreewalkingMod: IUserMod
+    public class FreewalkingMod : IUserMod
     {
+        public string Name => "Freewalking Mod";
 
-        public string Name 
-        {
-            get { return "Freewalking Mod"; }
-        }
-
-        public string Description 
-        {
-            get { return "Best mod for walking freely around your city!"; }
-			
-        }
+        public string Description => "Best mod for walking freely around your city!";
     }
 }

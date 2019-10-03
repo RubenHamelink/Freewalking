@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using ColossalFramework.Plugins;
+using Freewalking.UI;
 using Harmony;
 using ICities;
-using UnityEngine;
 
-namespace Freewalking
+namespace Freewalking.Loaders
 {
     public class HarmonyLoader : ILoadingExtension
     {
