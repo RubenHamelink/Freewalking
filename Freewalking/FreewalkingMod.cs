@@ -3,7 +3,7 @@
 namespace Freewalking
 {
 
-    public class MyIUserMod: IUserMod
+    public class FreewalkingMod: IUserMod
     {
 
         public string Name 
