@@ -13,6 +13,8 @@ namespace Freewalking
     {
         private const string name = "Freewalking Camera";
 
+        public static bool IsFreewalking = false;
+
         public void OnCreated(ICamera Camera)
         {
         }
@@ -23,12 +25,14 @@ namespace Freewalking
 
         public IEnumerator OnStart(ICamera camera)
         {
+            IsFreewalking = true;
             camera.FaceTowards(100, 1, 100);
             yield return new WaitForEndOfFrame();
         }
 
         public void OnAbort()
         {
+            IsFreewalking = false;
         }
 
         public string Name()
