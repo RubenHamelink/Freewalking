@@ -64,7 +64,8 @@
     <Compile Include="AssetLoader.cs" />
     <Compile Include="Find.cs" />
     <Compile Include="FreewalkingCamera.cs" />
-    <Compile Include="HarmonyLoader.cs" />
+    <Compile Include="Loaders\HarmonyLoader.cs" />
+    <Compile Include="Loaders\TerrainLoader.cs" />
     <Compile Include="SettingsPanel.cs" />
     <Compile Include="ModeButton.cs" />
     <Compile Include="Loader.cs" />
