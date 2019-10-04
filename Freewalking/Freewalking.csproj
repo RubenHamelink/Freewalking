@@ -61,17 +61,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Player\FirstPersonController.cs" />
+    <Compile Include="Player\MouseLook.cs" />
     <Compile Include="UI\FreewalkingCamera.cs" />
     <Compile Include="Loaders\HarmonyLoader.cs" />
     <Compile Include="Loaders\TerrainLoader.cs" />
-    <Compile Include="MouseLook.cs" />
     <Compile Include="FreewalkingMod.cs" />
-    <Compile Include="Player.cs" />
-    <Compile Include="PlayerControl.cs" />
-    <Compile Include="PlayerWalk.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="VehicleControl.cs" />
-    <Compile Include="VehicleFollow.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

@@ -39,11 +39,10 @@ namespace Freewalking.Loaders
         {
             GameObject plane = new GameObject("plane");
             MeshFilter filter = plane.AddComponent<MeshFilter>();
-            plane.AddComponent<MeshRenderer>();
+//            plane.AddComponent<MeshRenderer>();
             MeshCollider collider = plane.AddComponent<MeshCollider>();
-            Mesh mesh = GenerateMesh(position, size);
-            filter.mesh = mesh;
-            collider.sharedMesh = mesh;
+            filter.mesh = GenerateMesh(position, size);
+            collider.sharedMesh = filter.mesh;
             plane.transform.position = position;
             return plane;
         }
@@ -83,6 +82,7 @@ namespace Freewalking.Loaders
 
             Mesh mesh = new Mesh
             {
+                name = "planeMesh",
                 vertices = verts,
                 triangles = triangles.ToArray(),
                 uv = uv,
