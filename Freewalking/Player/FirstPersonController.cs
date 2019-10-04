@@ -1,53 +1,56 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ColossalFramework.Plugins;
+using Freewalking.UI;
 using ICities;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Freewalking.Player
 {
-    public class FirstPersonController : MonoBehaviour
+    public class FirstPersonController : MonoBehaviour, ILoadingExtension
     {
         public ICamera CinematicCamera;
 
         private Camera camera;
         private MouseLook mouseLook;
         private bool isWalking;
-        private float m_WalkSpeed = 5;
-        private float m_RunSpeed = 10;
-        private float m_RunstepLenghten = 0.7f;
-        private float m_JumpSpeed = 10;
-        private float m_StickToGroundForce = 10;
-        private float m_GravityMultiplier = 2;
-        private MouseLook m_MouseLook;
-        private bool m_UseFovKick = true;
-        private bool m_UseHeadBob = true;
-        private float m_StepInterval = 5;
-        private AudioClip[] m_FootstepSounds; // an array of footstep sounds that will be randomly selected from.
-        private AudioClip m_JumpSound; // the sound played when character leaves the ground.
-        private AudioClip m_LandSound; // the sound played when character touches back on ground.
+        private float walkSpeed = 5;
+        private float runSpeed = 10;
+        private float runstepLenghten = 0.7f;
+        private float jumpSpeed = 10;
+        private float stickToGroundForce = 10;
+        private float gravityMultiplier = 2;
+        private bool useFovKick = true;
+        private bool useHeadBob = true;
+        private float stepInterval = 5;
+        private AudioClip[] footstepSounds; // an array of footstep sounds that will be randomly selected from.
+        private AudioClip jumpSound; // the sound played when character leaves the ground.
+        private AudioClip landSound; // the sound played when character touches back on ground.
 
-        private Camera m_Camera;
-        private bool m_Jump;
-        private float m_YRotation;
-        private Vector2 m_Input;
-        private Vector3 m_MoveDir = Vector3.zero;
-        private CharacterController m_CharacterController;
-        private CollisionFlags m_CollisionFlags;
-        private bool m_PreviouslyGrounded;
-        private Vector3 m_OriginalCameraPosition;
-        private float m_StepCycle;
-        private float m_NextStep;
-        private bool m_Jumping;
-        private AudioSource m_AudioSource;
+        private bool jump;
+        private float yRotation;
+        private Vector2 input;
+        private Vector3 moveDir = Vector3.zero;
+        private CharacterController characterController;
+        private CollisionFlags collisionFlags;
+        private bool previouslyGrounded;
+        private Vector3 originalCameraPosition;
+        private float stepCycle;
+        private float nextStep;
+        private bool jumping;
+        private AudioSource audioSource;
+
+        private GameObject player;
 
         private void Start()
         {
-            m_CharacterController = GetComponent<CharacterController>();
-            m_StepCycle = 0f;
-            m_NextStep = m_StepCycle / 2f;
+            characterController = GetComponent<CharacterController>();
+            stepCycle = 0f;
+            nextStep = stepCycle / 2f;
             camera = Camera.main;
             mouseLook = new MouseLook(transform, camera.transform, CinematicCamera);
         }
@@ -56,80 +59,79 @@ namespace Freewalking.Player
         {
             RotateView();
             // the jump state needs to read here to make sure it is not missed
-            if (!m_Jump)
+            if (!jump)
             {
-                m_Jump = Input.GetKeyDown(KeyCode.Space);
+                jump = Input.GetKeyDown(KeyCode.Space);
             }
 
-            if (!m_PreviouslyGrounded && m_CharacterController.isGrounded)
+            if (!previouslyGrounded && characterController.isGrounded)
             {
 //                StartCoroutine(m_JumpBob.DoBobCycle());
 //                PlayLandingSound();
-                m_MoveDir.y = 0f;
-                m_Jumping = false;
+                moveDir.y = 0f;
+                jumping = false;
             }
-            if (!m_CharacterController.isGrounded && !m_Jumping && m_PreviouslyGrounded)
+            if (!characterController.isGrounded && !jumping && previouslyGrounded)
             {
-                m_MoveDir.y = 0f;
+                moveDir.y = 0f;
             }
 
-            m_PreviouslyGrounded = m_CharacterController.isGrounded;
+            previouslyGrounded = characterController.isGrounded;
         }
 
         private void FixedUpdate()
         {
             GetInput(out float speed);
             // always move along the camera forward as it is the direction that it being aimed at
-            Vector3 desiredMove = camera.transform.forward * m_Input.y + camera.transform.right * m_Input.x;
+            Vector3 desiredMove = camera.transform.forward * input.y + camera.transform.right * input.x;
 
             // get a normal for the surface that is being touched to move along it
-            Physics.SphereCast(transform.position, m_CharacterController.radius, Vector3.down, out RaycastHit hitInfo,
-                m_CharacterController.height / 2f, Physics.AllLayers, QueryTriggerInteraction.Ignore);
+            Physics.SphereCast(transform.position, characterController.radius, Vector3.down, out RaycastHit hitInfo,
+                characterController.height / 2f, Physics.AllLayers, QueryTriggerInteraction.Ignore);
             desiredMove = Vector3.ProjectOnPlane(desiredMove, hitInfo.normal).normalized;
 
-            m_MoveDir.x = desiredMove.x * speed;
-            m_MoveDir.z = desiredMove.z * speed;
+            moveDir.x = desiredMove.x * speed;
+            moveDir.z = desiredMove.z * speed;
             
-            if (m_CharacterController.isGrounded)
+            if (characterController.isGrounded)
             {
-                m_MoveDir.y = -m_StickToGroundForce;
+                moveDir.y = -stickToGroundForce;
 
-                if (m_Jump)
+                if (jump)
                 {
-                    m_MoveDir.y = m_JumpSpeed;
+                    moveDir.y = jumpSpeed;
 //                    PlayJumpSound();
-                    m_Jump = false;
-                    m_Jumping = true;
+                    jump = false;
+                    jumping = true;
                 }
             }
             else
             {
-                m_MoveDir += Physics.gravity * m_GravityMultiplier * Time.fixedDeltaTime;
+                moveDir += Physics.gravity * gravityMultiplier * Time.fixedDeltaTime;
             }
             
-            m_CollisionFlags = m_CharacterController.Move(m_MoveDir * Time.fixedDeltaTime);
+            collisionFlags = characterController.Move(moveDir * Time.fixedDeltaTime);
 
             ProgressStepCycle(speed);
 //            UpdateCameraPosition(speed);
             mouseLook.UpdateCursorLock();
         }
 
-
         private void ProgressStepCycle(float speed)
         {
-            if (m_CharacterController.velocity.sqrMagnitude > 0 && (m_Input.x != 0 || m_Input.y != 0))
+            if (characterController.velocity.sqrMagnitude > 0 && (input.x != 0 || input.y != 0))
             {
-                m_StepCycle += (m_CharacterController.velocity.magnitude +
-                                (speed * (isWalking ? 1f : m_RunstepLenghten))) *
+                stepCycle += (characterController.velocity.magnitude +
+                                (speed * (isWalking ? 1f : runstepLenghten))) *
                                Time.fixedDeltaTime;
             }
 
-            if (!(m_StepCycle > m_NextStep))
+            if (!(stepCycle > nextStep))
             {
                 return;
             }
 
-            m_NextStep = m_StepCycle + m_StepInterval;
+            nextStep = stepCycle + stepInterval;
 
 //            PlayFootStepAudio();
         }
@@ -152,34 +154,90 @@ namespace Freewalking.Player
             isWalking = !Input.GetKey(KeyCode.LeftShift);
 
             // set the desired speed to be walking or running
-            speed = isWalking ? m_WalkSpeed : m_RunSpeed;
-            m_Input = new Vector2(horizontal, vertical);
+            speed = isWalking ? walkSpeed : runSpeed;
+            input = new Vector2(horizontal, vertical);
 
-            if (m_Input == Vector2.zero)
+            if (input == Vector2.zero)
             {
                 if (Input.GetKey(KeyCode.W))
-                    m_Input.y += 1;
+                    input.y += 1;
                 if (Input.GetKey(KeyCode.S))
-                    m_Input.y -= 1;
+                    input.y -= 1;
                 if (Input.GetKey(KeyCode.D))
-                    m_Input.x += 1;
+                    input.x += 1;
                 if (Input.GetKey(KeyCode.A))
-                    m_Input.x -= 1;
+                    input.x -= 1;
             }
 
             // normalize input if it exceeds 1 in combined length:
-            if (m_Input.sqrMagnitude > 1)
+            if (input.sqrMagnitude > 1)
             {
-                m_Input.Normalize();
+                input.Normalize();
             }
             
             // handle speed change to give an fov kick
             // only if the player is going to a run, is running and the fovkick is to be used
-//            if (isWalking != waswalking && m_UseFovKick && m_CharacterController.velocity.sqrMagnitude > 0)
+//            if (isWalking != waswalking && useFovKick && characterController.velocity.sqrMagnitude > 0)
 //            {
 //                StopAllCoroutines();
 //                StartCoroutine(!isWalking ? m_FovKick.FOVKickUp() : m_FovKick.FOVKickDown());
 //            }
+        }
+
+        public void OnCreated(ILoading loading)
+        {
+        }
+
+        public void OnReleased()
+        {
+        }
+
+        public void OnLevelLoaded(LoadMode mode)
+        {
+            FreewalkingCamera.OnEnterFreewalking += OnEnterFreewalking;
+            FreewalkingCamera.OnExitFreewalking += OnExitFreewalking;
+        }
+
+        public void OnLevelUnloading()
+        {
+            FreewalkingCamera.OnEnterFreewalking -= OnEnterFreewalking;
+            FreewalkingCamera.OnExitFreewalking -= OnExitFreewalking;
+        }
+
+        private void OnEnterFreewalking(ICamera camera)
+        {
+            player = new GameObject("Player");
+            Rigidbody rigidbody = player.AddComponent<Rigidbody>();
+            rigidbody.isKinematic = true;
+
+            CharacterController character = player.AddComponent<CharacterController>();
+
+            FirstPersonController controller = player.AddComponent<FirstPersonController>();
+            controller.CinematicCamera = camera;
+
+            Camera current = UnityEngine.Camera.current;
+            Vector3 position = current.transform.position;
+            position.y = camera.managers.terrain.SampleTerrainHeight(position.x, position.z) + 5;
+            player.transform.position = position;
+
+            camera.StartRoutine(FollowTransform(camera, player.transform, new Vector3(0, 0.5f, 0)));
+        }
+
+        private void OnExitFreewalking()
+        {
+            Destroy(player);
+        }
+
+        private IEnumerator FollowTransform(ICamera camera, Transform follow, Vector3 relativeDistance)
+        {
+            while (FreewalkingCamera.IsFreewalking)
+            {
+                Camera.current.transform.position = new Vector3(
+                    follow.position.x + relativeDistance.x,
+                    follow.position.y + relativeDistance.y,
+                    follow.position.z + relativeDistance.z);
+                yield return camera.WaitForNextFrame();
+            }
         }
     }
 }
