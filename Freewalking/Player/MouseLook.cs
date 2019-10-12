@@ -16,16 +16,16 @@ namespace Freewalking.Player
         public float smoothTime = 5f;
         public bool lockCursor = true;
         
-        private Quaternion m_CharacterTargetRot;
-        private Quaternion m_CameraTargetRot;
-        private bool m_cursorIsLocked = true;
+        private Quaternion characterTargetRot;
+        private Quaternion cameraTargetRot;
+        private bool cursorIsLocked = true;
 
-        private ICamera cinematicCamera;
+        private readonly ICamera cinematicCamera;
 
         public MouseLook(Transform character, Transform camera, ICamera cinematicCamera)
         {
-            m_CharacterTargetRot = character.localRotation;
-            m_CameraTargetRot = camera.transform.localRotation;
+            characterTargetRot = character.localRotation;
+            cameraTargetRot = camera.transform.localRotation;
             this.cinematicCamera = cinematicCamera;
         }
 
@@ -34,11 +34,11 @@ namespace Freewalking.Player
             float yRot = Input.GetAxis("Mouse X") * XSensitivity;
             float xRot = Input.GetAxis("Mouse Y") * YSensitivity;
 
-            m_CharacterTargetRot *= Quaternion.Euler(0f, yRot, 0f);
-            m_CameraTargetRot *= Quaternion.Euler(-xRot, 0f, 0f);
+            characterTargetRot *= Quaternion.Euler(0f, yRot, 0f);
+            cameraTargetRot *= Quaternion.Euler(-xRot, 0f, 0f);
 
             if (clampVerticalRotation)
-                m_CameraTargetRot = ClampRotationAroundXAxis(m_CameraTargetRot);
+                cameraTargetRot = ClampRotationAroundXAxis(cameraTargetRot);
 
             cinematicCamera.RotateCamera(yRot, -xRot, 0);
             UpdateCursorLock();
@@ -66,19 +66,19 @@ namespace Freewalking.Player
         {
             if (Input.GetKeyUp(KeyCode.Escape))
             {
-                m_cursorIsLocked = false;
+                cursorIsLocked = false;
             }
             else if (Input.GetMouseButtonUp(0))
             {
-                m_cursorIsLocked = true;
+                cursorIsLocked = true;
             }
 
-            if (m_cursorIsLocked)
+            if (cursorIsLocked)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
-            else if (!m_cursorIsLocked)
+            else if (!cursorIsLocked)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;

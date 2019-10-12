@@ -61,6 +61,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MeshDrawer.cs" />
+    <Compile Include="Loaders\Collision\BuildingCollisionLoader.cs" />
+    <Compile Include="Loaders\Collision\CollisionLoader.cs" />
+    <Compile Include="Loaders\Collision\RoadCollisionLoader.cs" />
     <Compile Include="Player\FirstPersonController.cs" />
     <Compile Include="Player\MouseLook.cs" />
     <Compile Include="UI\FreewalkingCamera.cs" />

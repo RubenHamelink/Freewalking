@@ -39,7 +39,6 @@ namespace Freewalking.Loaders
         {
             GameObject plane = new GameObject("plane");
             MeshFilter filter = plane.AddComponent<MeshFilter>();
-//            plane.AddComponent<MeshRenderer>();
             MeshCollider collider = plane.AddComponent<MeshCollider>();
             filter.mesh = GenerateMesh(position, size);
             collider.sharedMesh = filter.mesh;
@@ -118,7 +117,6 @@ namespace Freewalking.Loaders
             this.terrain = terrain;
             GameObject terrainLoader = new GameObject("TerrainLoader");
             terrainLoader.AddComponent<TerrainLoader>().terrain = terrain;
-            DebugOutputPanel.AddMessage(PluginManager.MessageType.Message, $"Created terrain loader");
         }
 
         public void CreateCellClusterAt(Vector3 position, int radius)

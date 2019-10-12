@@ -18,8 +18,8 @@ namespace Freewalking.Player
         private Camera camera;
         private MouseLook mouseLook;
         private bool isWalking;
-        private float walkSpeed = 5;
-        private float runSpeed = 10;
+        private float walkSpeed = 25;
+        private float runSpeed = 50;
         private float runstepLenghten = 0.7f;
         private float jumpSpeed = 10;
         private float stickToGroundForce = 10;
