@@ -7,6 +7,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using ColossalFramework;
 using ColossalFramework.IO;
+using ColossalFramework.Math;
+using ColossalFramework.Plugins;
 using ICities;
 using JetBrains.Annotations;
 using UnityEngine;
@@ -18,7 +20,6 @@ namespace Freewalking.Loaders.Collision
     public class RoadCollisionLoader : CollisionLoader
     {
         private NetManager netManager;
-        private ushort lastId = 0;
 
         public override void OnCreated(ILoading loading)
         {
@@ -28,9 +29,6 @@ namespace Freewalking.Loaders.Collision
         protected override ushort GetNearestObjectId(ICamera camera, Vector3 position)
         {
             ushort road = FindRoad(position);
-
-
-            lastId = road;
             return road;
         }
 
@@ -40,13 +38,21 @@ namespace Freewalking.Loaders.Collision
                 return null;
 
             NetSegment segment = netManager.m_segments.m_buffer[segmentId];
+            Mesh mesh = GetSegmentMesh(segmentId);
+
+            return mesh;
+        }
+
+        private Mesh GetSegmentMesh(ushort segmentId)
+        {
+            NetSegment segment = netManager.m_segments.m_buffer[segmentId];
             NetInfo info = segment.Info;
             NetInfo.Segment seg = info.m_segments[0];
 
             Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
             Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
             Vector3 m_position = (position1 + position2) * 0.5f;
-
+            
             float vscale = info.m_netAI.GetVScale();
             segment.CalculateCorner(segmentId, true, true, true, out Vector3 cornerPos1, out Vector3 cornerDirection1,
                 out bool smooth1);
@@ -69,73 +75,38 @@ namespace Freewalking.Loaders.Collision
 
             Vector4 scale = new Vector4(0.5f / info.m_halfWidth, 1f / info.m_segmentLength, 1f, 1f);
 
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            GetMeshPart(cornerPos1, middlePos1_1, middlePos2_1, cornerPos4,
-                cornerPos3, middlePos1_2, middlePos2_2, cornerPos2,
-                ref vertices, ref triangles);
-
             Mesh mesh = new Mesh
             {
-                vertices = vertices.ToArray(),
-                triangles = triangles.ToArray()
-//                vertices = new[]
-//                {
-//                    cornerPos1,
-//                    cornerPos2,
-//                    cornerPos3,
-//                    cornerPos4,
-//                    middlePos1_1,
-//                    middlePos1_2,
-//                    middlePos2_1,
-//                    middlePos2_2,
-//                },
-//                normals = new Vector3[8],
-//                triangles = new []
-//                {
-//                    0, 4, 2,
-//                    2, 4, 5,
-//                    4, 7, 5,
-//                    6, 7, 4,
-//                    1, 7, 3,
-//                    3, 7, 6
-//                }
+                vertices = seg.m_segmentMesh.vertices,
+                triangles = seg.m_segmentMesh.triangles
             };
+            List<Vector3> vertices = mesh.vertices.ToList();
 
-//            mesh = seg.m_segmentMesh;
+            Bezier3 leftBezier = new Bezier3(
+                leftMatrix.GetColumn(0),
+                leftMatrix.GetColumn(1),
+                leftMatrix.GetColumn(2),
+                leftMatrix.GetColumn(3));
+            Bezier3 rightBezier = new Bezier3(
+                rightMatrix.GetColumn(0),
+                rightMatrix.GetColumn(1),
+                rightMatrix.GetColumn(2),
+                rightMatrix.GetColumn(3));
 
-//            mesh.vertices[0] = mesh.vertices[0] - new Vector3(leftMatrix.m00, leftMatrix.m01, leftMatrix.m02);
-            
+            for (var i = 0; i < vertices.Count; i++)
+            {
+                Vector3 vertex = vertices[i];
+                vertex = TransformVertex(vertex.x < 0 ? leftBezier : rightBezier, vertex, info.m_segmentLength,
+                    info.m_halfWidth);
+
+                vertices[i] = vertex;
+            }
+
+            mesh.vertices = vertices.ToArray();
+
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
             return mesh;
-        }
-
-        private void GetMeshPart(
-            Vector3 startPos,
-            Vector3 middlePos1,
-            Vector3 middlePos2,
-            Vector3 endPos,
-            Vector3 startPosB,
-            Vector3 middlePosB1,
-            Vector3 middlePosB2,
-            Vector3 endPosB,
-            ref List<Vector3> vertices, 
-            ref List<int> triangles)
-        {
-            int i = vertices.Count;
-            vertices.AddRange(new[]
-            {
-                startPos, middlePos1, middlePos2, endPos,
-                startPosB, middlePosB1, middlePosB2, endPosB
-            });
-            triangles.AddRange(new[]
-            {
-                0, 1, 5,
-                5, 1, 6,
-                1, 2, 6,
-                6, 7, 2,
-                2, 3, 6,
-                6, 3, 7
-            });
         }
 
         private void CreateActualRoad(ushort segmentId)
@@ -148,8 +119,8 @@ namespace Freewalking.Loaders.Collision
             NetInfo info = segment.Info;
             NetInfo.Segment seg = info.m_segments[0];
 
-            Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
-            Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
+            Vector3 position1 = netManager.m_nodes.m_buffer[(int)segment.m_startNode].m_position;
+            Vector3 position2 = netManager.m_nodes.m_buffer[(int)segment.m_endNode].m_position;
             Vector3 m_position = (position1 + position2) * 0.5f;
 
             float vscale = info.m_netAI.GetVScale();
@@ -190,18 +161,35 @@ namespace Freewalking.Loaders.Collision
             filter.mesh = seg.m_segmentMesh;
         }
 
+        private Vector3 TransformVertex(Bezier3 bezier, Vector3 vertex, float length, float width)
+        {
+            float t = Map(0, 1, -length / 2, length / 2, vertex.z);
+            var position = bezier.Position(t);
+            var tangent = bezier.Tangent(t);
+            var dir = Vector3.Cross(Vector3.up, tangent);
+            var sideDir = dir.normalized * vertex.x + (vertex.x < 0 ? dir.normalized * width : -dir.normalized * width);
+            position.y += vertex.y;
+            position += sideDir;
+            return position;
+        }
+
+        private float Map(float newMin, float newMax, float originalMin, float originalMax, float value)
+        {
+            return Mathf.Lerp(newMin, newMax, Mathf.InverseLerp(originalMin, originalMax, value));
+        }
+
         protected override void CalculateMeshPosition(ushort id, out Vector3 meshPosition, out Quaternion meshRotation)
         {
             NetSegment segment = netManager.m_segments.m_buffer[id];
             Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
             Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
-            meshPosition = /*(position1 + position2) * 0.5f +*/Vector3.zero;
+            meshPosition = (position1 + position2) * 0.5f;
             meshRotation = Quaternion.identity;
         }
 
         public ushort FindRoad(Vector3 position)
         {
-            Bounds bounds = new Bounds(position, new Vector3(100f, 20f, 100f));
+            Bounds bounds = new Bounds(position, new Vector3(20f, 20f, 20f));
             int num = Mathf.Max((int) ((bounds.min.x - 64f) / 64f + 135f), 0);
             int num2 = Mathf.Max((int) ((bounds.min.z - 64f) / 64f + 135f), 0);
             int num3 = Mathf.Min((int) ((bounds.max.x + 64f) / 64f + 135f), 269);
@@ -233,7 +221,7 @@ namespace Freewalking.Loaders.Collision
                                 instance.m_segments.m_buffer[(int) num5].m_bounds.Intersects(bounds) && instance
                                     .m_segments.m_buffer[(int) num5].GetClosestLanePosition(position,
                                         NetInfo.LaneType.Vehicle | NetInfo.LaneType.TransportVehicle,
-                                        VehicleInfo.VehicleType.Car, VehicleInfo.VehicleType.None, false, out Vector3 b,
+                                        VehicleInfo.VehicleType.Car | VehicleInfo.VehicleType.All, VehicleInfo.VehicleType.None, false, out Vector3 b,
                                         out int num9, out float num10, out Vector3 vector, out int num11,
                                         out float num12))
                             {
