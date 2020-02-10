@@ -47,12 +47,19 @@ namespace Freewalking.Loaders.Collision
         {
             NetSegment segment = netManager.m_segments.m_buffer[segmentId];
             NetInfo info = segment.Info;
-            NetInfo.Segment seg = info.m_segments[0];
+            
+            Debug.Log(info.m_segments.Length);
+            NetInfo.Segment seg = info.m_segments.Length == 1 ? info.m_segments[0] : info.m_segments[2];
+
+            Debug.Log(NetNode.BlendJunction(segment.m_startNode));
 
             Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
             Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
             Vector3 m_position = (position1 + position2) * 0.5f;
-            
+
+            CreateNode(segment.m_startNode);
+            CreateNode(segment.m_endNode);
+
             float vscale = info.m_netAI.GetVScale();
             segment.CalculateCorner(segmentId, true, true, true, out Vector3 cornerPos1, out Vector3 cornerDirection1,
                 out bool smooth1);
@@ -72,8 +79,6 @@ namespace Freewalking.Loaders.Collision
                 cornerPos4, cornerPos3, middlePos1_2, middlePos2_2, cornerPos2, m_position, vscale);
             Matrix4x4 rightMatrix = NetSegment.CalculateControlMatrix(cornerPos3, middlePos1_2, middlePos2_2,
                 cornerPos2, cornerPos1, middlePos1_1, middlePos2_1, cornerPos4, m_position, vscale);
-
-            Vector4 scale = new Vector4(0.5f / info.m_halfWidth, 1f / info.m_segmentLength, 1f, 1f);
 
             Mesh mesh = new Mesh
             {
@@ -109,6 +114,102 @@ namespace Freewalking.Loaders.Collision
             return mesh;
         }
 
+        private void CreateNode(ushort nodeId)
+        {
+            NetNode node = netManager.m_nodes.m_buffer[nodeId];
+            NetInfo info = node.Info;
+            NetInfo.Node nodeInfo = node.Info.m_nodes[0];
+
+            var m_position = node.m_position;
+            
+            Vector3 lhs1 = Vector3.zero;
+            Vector3 rhs1 = Vector3.zero;
+            Vector3 lhs2 = Vector3.zero;
+            Vector3 lhs3 = Vector3.zero;
+
+            NetInfo.Segment seg = info.m_segments[0];
+
+            if ((node.m_flags & NetNode.Flags.End) != NetNode.Flags.None)
+            {
+                Vector3 cornerPos1 = Vector3.zero;
+                Vector3 cornerPos2 = Vector3.zero;
+                Vector3 cornerDirection1 = Vector3.zero;
+                Vector3 cornerDirection2 = Vector3.zero;
+                Vector3 vector3_3 = Vector3.zero;
+                Vector3 vector3_4 = Vector3.zero;
+                for (int index = 0; index < 8; ++index)
+                {
+                    ushort segment = node.GetSegment(index);
+                    if (segment != (ushort)0)
+                    {
+                        NetSegment netSegment = Singleton<NetManager>.instance.m_segments.m_buffer[(int)segment];
+                        bool start = (int)netSegment.m_startNode == (int)nodeId;
+                        bool smooth;
+                        netSegment.CalculateCorner(segment, true, start, false, out cornerPos1, out cornerDirection1, out smooth);
+                        netSegment.CalculateCorner(segment, true, start, true, out cornerPos2, out cornerDirection2, out smooth);
+                        lhs1 = cornerPos2;
+                        rhs1 = cornerPos1;
+                        vector3_3 = cornerDirection2;
+                        vector3_4 = cornerDirection1;
+                    }
+                }
+                float num = info.m_netAI.GetEndRadius() * 1.333333f;
+                lhs2 = cornerPos1 - cornerDirection1 * num;
+                lhs3 = lhs1 - vector3_3 * num;
+                Vector3 rhs2 = cornerPos2 + cornerDirection2 * num;
+                Vector3 rhs3 = rhs1 + vector3_4 * num;
+//                vector3_1 = Vector3.Min(Vector3.Min(Vector3.Min(cornerPos1, cornerPos2), Vector3.Min(lhs2, rhs2)), Vector3.Min(Vector3.Min(lhs3, rhs3), Vector3.Min(lhs1, rhs1)));
+//                vector3_2 = Vector3.Max(Vector3.Max(Vector3.Max(cornerPos1, cornerPos2), Vector3.Max(lhs2, rhs2)), Vector3.Max(Vector3.Max(lhs3, rhs3), Vector3.Max(lhs1, rhs1)));
+            }
+
+            Mesh mesh = new Mesh
+            {
+                vertices = info.m_nodes[0].m_nodeMesh.vertices,
+                triangles = info.m_nodes[0].m_nodeMesh.triangles
+            };
+            List<Vector3> vertices = mesh.vertices.ToList();
+
+            Bezier3 bezier = new Bezier3(
+                lhs1 - m_position,
+                lhs3 - m_position,
+                lhs2 - m_position,
+                rhs1 - m_position);
+
+            for (var i = 0; i < vertices.Count; i++)
+            {
+                Vector3 vertex = vertices[i];
+                if (vertex.x > 0)
+                    vertex = TransformVertex(bezier, vertex, info.m_segmentLength,
+                        info.m_halfWidth);
+                else
+                    vertex = new Vector3(0, -0.25f, 0);
+
+                vertices[i] = vertex;
+            }
+
+            mesh.vertices = vertices.ToArray();
+
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
+
+            GameObject road = new GameObject("Road");
+
+//            Material material = new Material(nodeInfo.m_material);
+//            material.SetMatrix(netManager.ID_LeftMatrix, m_dataMatrix0);
+//            material.SetMatrix(netManager.ID_RightMatrix, m_dataMatrix1);
+
+//            material.SetVector(netManager.ID_MeshScale, m_dataVector0);
+
+            MeshFilter filter = road.AddComponent<MeshFilter>();
+            MeshRenderer renderer = road.AddComponent<MeshRenderer>();
+            road.transform.position = m_position;
+            road.transform.rotation = Quaternion.identity;
+//            renderer.material = material;
+            MeshCollider collider = road.AddComponent<MeshCollider>();
+            collider.sharedMesh = mesh;
+            filter.mesh = mesh;
+        }
+
         private void CreateActualRoad(ushort segmentId)
         {
             // this is a method for creating the actual road
@@ -119,8 +220,8 @@ namespace Freewalking.Loaders.Collision
             NetInfo info = segment.Info;
             NetInfo.Segment seg = info.m_segments[0];
 
-            Vector3 position1 = netManager.m_nodes.m_buffer[(int)segment.m_startNode].m_position;
-            Vector3 position2 = netManager.m_nodes.m_buffer[(int)segment.m_endNode].m_position;
+            Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
+            Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
             Vector3 m_position = (position1 + position2) * 0.5f;
 
             float vscale = info.m_netAI.GetVScale();
@@ -221,7 +322,8 @@ namespace Freewalking.Loaders.Collision
                                 instance.m_segments.m_buffer[(int) num5].m_bounds.Intersects(bounds) && instance
                                     .m_segments.m_buffer[(int) num5].GetClosestLanePosition(position,
                                         NetInfo.LaneType.Vehicle | NetInfo.LaneType.TransportVehicle,
-                                        VehicleInfo.VehicleType.Car | VehicleInfo.VehicleType.All, VehicleInfo.VehicleType.None, false, out Vector3 b,
+                                        VehicleInfo.VehicleType.Car | VehicleInfo.VehicleType.All,
+                                        VehicleInfo.VehicleType.None, false, out Vector3 b,
                                         out int num9, out float num10, out Vector3 vector, out int num11,
                                         out float num12))
                             {
