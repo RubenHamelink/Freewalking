@@ -61,6 +61,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Loaders\Collision\Nodes\BendNodeCalculator.cs" />
+    <Compile Include="Loaders\Collision\Nodes\EndNodeCalculator.cs" />
+    <Compile Include="Loaders\Collision\Nodes\INodeCalculator.cs" />
     <Compile Include="MeshDrawer.cs" />
     <Compile Include="Loaders\Collision\BuildingCollisionLoader.cs" />
     <Compile Include="Loaders\Collision\CollisionLoader.cs" />
@@ -73,6 +76,7 @@
     <Compile Include="FreewalkingMod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>mkdir "%25LOCALAPPDATA%25\Colossal Order\Cities_Skylines\Addons\Mods\$(SolutionName)"
