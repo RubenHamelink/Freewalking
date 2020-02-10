@@ -43,7 +43,7 @@ namespace Freewalking.Loaders.Collision
             Mesh startMesh = GetNodeMesh(segment.m_startNode, out Vector3 startPosition);
             Mesh endMesh = GetNodeMesh(segment.m_endNode, out Vector3 endPosition);
 
-            CombineInstance[] combineInstances = 
+            CombineInstance[] combineInstances =
             {
                 new CombineInstance {mesh = mesh, transform = Matrix4x4.identity},
                 new CombineInstance {mesh = startMesh, transform = Matrix4x4.Translate(startPosition - position)},
@@ -61,11 +61,11 @@ namespace Freewalking.Loaders.Collision
             NetInfo info = segment.Info;
 
             NetInfo.Segment seg = info.m_segments.Length == 1 ? info.m_segments[0] : info.m_segments[2];
-            
+
             Vector3 position1 = netManager.m_nodes.m_buffer[(int) segment.m_startNode].m_position;
             Vector3 position2 = netManager.m_nodes.m_buffer[(int) segment.m_endNode].m_position;
             position = (position1 + position2) * 0.5f;
-            
+
             float vscale = info.m_netAI.GetVScale();
             segment.CalculateCorner(segmentId, true, true, true, out Vector3 cornerPos1, out Vector3 cornerDirection1,
                 out bool smooth1);
@@ -136,7 +136,16 @@ namespace Freewalking.Loaders.Collision
 
             INodeCalculator nodeCalculator = null;
 
-            if ((node.m_flags & NetNode.Flags.End) != NetNode.Flags.None)
+            if ((node.m_flags & NetNode.Flags.Junction) != NetNode.Flags.None)
+            {
+                return GetJunctionMesh(nodeId, position, node, info);
+            }
+
+            if ((node.m_flags & NetNode.Flags.Bend) != NetNode.Flags.None)
+            {
+                nodeCalculator = new BendNodeCalculator();
+            }
+            else if ((node.m_flags & NetNode.Flags.End) != NetNode.Flags.None)
             {
                 nodeCalculator = new EndNodeCalculator();
             }
@@ -150,9 +159,105 @@ namespace Freewalking.Loaders.Collision
             return mesh;
         }
 
+        private Mesh GetJunctionMesh(ushort nodeId, Vector3 position, NetNode node, NetInfo info)
+        {
+            Vector3 m = new Vector3(0, -0.25f, 0);
+            Bezier3 leftBezier = new Bezier3(m, m, m, m);
+            Bezier3 rightBezier;
+            List<CombineInstance> combineInstances = new List<CombineInstance>();
+
+            for (int index1 = 0; index1 < node.CountSegments(); index1++)
+            {
+                var segment1 = node.GetSegment(index1);
+                NetSegment netSegment1 = Singleton<NetManager>.instance.m_segments.m_buffer[(int) segment1];
+                if (netSegment1.Info != null)
+                {
+                    Vector3 cornerPos1 = Vector3.zero;
+                    Vector3 cornerDirection1 = Vector3.zero;
+                    Vector3 cornerPos2 = Vector3.zero;
+                    Vector3 cornerDirection2 = Vector3.zero;
+                    Vector3 vector3_3 = (int) nodeId != (int) netSegment1.m_startNode
+                        ? netSegment1.m_endDirection
+                        : netSegment1.m_startDirection;
+                    float num1 = -4f;
+                    ushort segmentID = 0;
+                    for (int index2 = 0; index2 < 8; ++index2)
+                    {
+                        ushort segment2 = node.GetSegment(index2);
+                        if (segment2 != (ushort) 0 && (int) segment2 != (int) segment1)
+                        {
+                            NetSegment netSegment2 =
+                                Singleton<NetManager>.instance.m_segments.m_buffer[(int) segment2];
+                            if (netSegment2.Info != null)
+                            {
+                                Vector3 vector3_4 = (int) nodeId != (int) netSegment2.m_startNode
+                                    ? netSegment2.m_endDirection
+                                    : netSegment2.m_startDirection;
+                                float num2 = (float) ((double) vector3_3.x * (double) vector3_4.x +
+                                                      (double) vector3_3.z * (double) vector3_4.z);
+                                if ((double) vector3_4.z * (double) vector3_3.x -
+                                    (double) vector3_4.x * (double) vector3_3.z < 0.0)
+                                {
+                                    if ((double) num2 > (double) num1)
+                                    {
+                                        num1 = num2;
+                                        segmentID = segment2;
+                                    }
+                                }
+                                else
+                                {
+                                    float num3 = -2f - num2;
+                                    if ((double) num3 > (double) num1)
+                                    {
+                                        num1 = num3;
+                                        segmentID = segment2;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    bool start1 = (int) netSegment1.m_startNode == (int) nodeId;
+                    bool smooth;
+                    netSegment1.CalculateCorner(segment1, true, start1, false, out cornerPos1, out cornerDirection1,
+                        out smooth);
+                    if (segmentID != (ushort) 0)
+                    {
+                        NetSegment netSegment2 =
+                            Singleton<NetManager>.instance.m_segments.m_buffer[(int) segmentID];
+                        bool start2 = (int) netSegment2.m_startNode == (int) nodeId;
+                        netSegment2.CalculateCorner(segmentID, true, start2, true, out cornerPos2,
+                            out cornerDirection2,
+                            out smooth);
+                    }
+
+
+                    NetSegment.CalculateMiddlePoints(cornerPos1, -cornerDirection1, cornerPos2, -cornerDirection2,
+                        true,
+                        true, out Vector3 middlePos1, out Vector3 middlePos2);
+                    
+                    rightBezier = new Bezier3(
+                        cornerPos2 - position,
+                        middlePos2 - position,
+                        middlePos1 - position,
+                        cornerPos1 - position
+                    );
+                    combineInstances.Add(new CombineInstance
+                    {
+                        mesh = BendMesh(node.Info.m_nodes[0].m_nodeMesh, leftBezier, rightBezier, info),
+                        transform = Matrix4x4.identity
+                    });
+                }
+            }
+
+            Mesh junction = new Mesh();
+            junction.CombineMeshes(combineInstances.ToArray());
+            return junction;
+        }
+
         private Vector3 TransformVertex(Bezier3 bezier, Vector3 vertex, float length, float width)
         {
-            float t = Map(0, 1, -length / 2, length / 2, vertex.z);
+            float t = Utility.Map(0, 1, -length / 2, length / 2, vertex.z);
             var position = bezier.Position(t);
             var tangent = bezier.Tangent(t);
             var dir = Vector3.Cross(Vector3.up, tangent);
@@ -161,12 +266,7 @@ namespace Freewalking.Loaders.Collision
             position += sideDir;
             return position;
         }
-
-        private float Map(float newMin, float newMax, float originalMin, float originalMax, float value)
-        {
-            return Mathf.Lerp(newMin, newMax, Mathf.InverseLerp(originalMin, originalMax, value));
-        }
-
+        
         protected override void CalculateMeshPosition(ushort id, out Vector3 meshPosition, out Quaternion meshRotation)
         {
             NetSegment segment = netManager.m_segments.m_buffer[id];

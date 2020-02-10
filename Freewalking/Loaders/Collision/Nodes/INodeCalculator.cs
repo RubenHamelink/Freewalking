@@ -9,6 +9,6 @@ namespace Freewalking.Loaders.Collision.Nodes
 {
     public interface INodeCalculator
     {
-        void GetBeziers(ushort nodeId, NetNode node, NetInfo info, Vector3 position, out Bezier3 leftBazier, out Bezier3 rightBezier);
+        void GetBeziers(ushort nodeId, NetNode node, NetInfo info, Vector3 position, out Bezier3 leftBezier, out Bezier3 rightBezier);
     }
 }
